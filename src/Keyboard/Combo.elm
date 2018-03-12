@@ -164,25 +164,28 @@ module Keyboard.Combo
 
 import Keyboard.Extra
 import Task
+import Set exposing (Set)
+import List exposing (map)
+import Char exposing (KeyCode)
 
 
 -- Model
-
-
-{-| Internal state that keeps track of keys currently pressed and key combos
--}
-type alias Model msg =
-    { keys : Keyboard.Extra.State
-    , combos : List (KeyCombo msg)
-    , toMsg : Msg -> msg
-    , activeCombo : Maybe (KeyCombo msg)
-    }
 
 
 {-| Each key uses this type
 -}
 type alias Key =
     Keyboard.Extra.Key
+
+
+{-| Internal state that keeps track of keys currently pressed and key combos
+-}
+type alias Model msg =
+    { keys : List Key
+    , combos : List (KeyCombo msg)
+    , toMsg : Msg -> msg
+    , activeCombo : Maybe (KeyCombo msg)
+    }
 
 
 {-| Combo length types
@@ -214,7 +217,7 @@ type KeyCombo msg
 -}
 init : List (KeyCombo msg) -> (Msg -> msg) -> Model msg
 init combos toMsg =
-    { keys = Keyboard.Extra.initialState
+    { keys = []
     , combos = combos
     , toMsg = toMsg
     , activeCombo = Nothing
@@ -248,7 +251,7 @@ type alias Msg =
                     ( updatedKeys, comboCmd ) =
                         Keyboard.Combo.update msg model.combos
                 in
-                ( { model | combos = updatedKeys }, comboCmd )
+                    ( { model | combos = updatedKeys }, comboCmd )
 
 -}
 update : Msg -> Model msg -> ( Model msg, Cmd msg )
@@ -720,8 +723,8 @@ updateActiveCombo model =
         possibleCombo =
             matchesCombo model
     in
-    { model | activeCombo = possibleCombo }
-        ! getComboCmd possibleCombo model
+        { model | activeCombo = possibleCombo }
+            ! getComboCmd possibleCombo model
 
 
 getComboCmd : Maybe (KeyCombo msg) -> Model msg -> List (Cmd msg)
@@ -741,32 +744,33 @@ performComboTask combo =
         |> Task.perform (\x -> x)
 
 
-arePressed : Keyboard.Extra.State -> List Key -> Bool
-arePressed keyTracker keysPressed =
-    List.all
-        (\key -> Keyboard.Extra.isPressed key keyTracker)
-        keysPressed
-
-
 matchesCombo : Model msg -> Maybe (KeyCombo msg)
 matchesCombo model =
-    find (\combo -> arePressed model.keys <| keyList combo) model.combos
+    let
+        keys =
+            map (\k -> Keyboard.Extra.toCode k) model.keys
+    in
+        find (\combo -> Set.fromList (keyList combo) == Set.fromList keys) model.combos
 
 
-keyList : KeyCombo msg -> List Key
+keyList : KeyCombo msg -> List KeyCode
 keyList combo =
-    case combo of
-        KeyCombo key msg ->
-            [ key ]
+    let
+        toCode =
+            Keyboard.Extra.toCode
+    in
+        case combo of
+            KeyCombo key msg ->
+                [ toCode key ]
 
-        KeyCombo2 key1 key2 msg ->
-            [ key1, key2 ]
+            KeyCombo2 key1 key2 msg ->
+                [ toCode key1, toCode key2 ]
 
-        KeyCombo3 key1 key2 key3 msg ->
-            [ key1, key2, key3 ]
+            KeyCombo3 key1 key2 key3 msg ->
+                [ toCode key1, toCode key2, toCode key3 ]
 
-        KeyCombo4 key1 key2 key3 key4 msg ->
-            [ key1, key2, key3, key4 ]
+            KeyCombo4 key1 key2 key3 key4 msg ->
+                [ toCode key1, toCode key2, toCode key3, toCode key4 ]
 
 
 getComboMsg : KeyCombo msg -> msg
